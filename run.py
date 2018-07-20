@@ -153,6 +153,31 @@ def run_generic_fMRI_surface_processsing(**args):
     cmd = cmd.format(**args)
     run(cmd, cwd=args["path"], env={"OMP_NUM_THREADS": str(args["n_cpus"])})
 
+def run_fMRI_task_analysis(**args):
+    """Initial support for task analysis"""
+    args.update(os.environ)
+    cmd = (
+    '{HCPPIPEDIR}/TaskfMRIAnalysis/TaskfMRIAnalysis.sh '
+    '--path={path} '
+    '--subject={subject} '
+    '--lvl1tasks={fmriname} '
+    '--lvl1fsfs={fmriname} '
+    '--lvl2task={taskname} '
+    '--lvl2fsf={taskname} '
+    '--lowresmesh={lowresmesh} '
+    '--grayordinatesres={grayordinatesres} '
+    '--origsmoothingFWHM={fmrires} '
+    '--confound="NONE" '
+    '--finalsmoothingFWHM=4 ' # additional spatial smoothing
+    '--temporalfilter={tfilter} '
+    '--vba="NO" ' # volume based analysis
+    '--regname="NONE" ' # generated CIFTI
+    '--parcellation={parcellation} '
+    '--parcellationfile={parcellationfile} '
+    )
+    cmd = cmd.format(**args)
+    run(cmd, cwd=args["path"], env={"OMP_NUM_THREADS": str(args["n_cpus"])})
+
 def run_diffusion_processsing(**args):
     args.update(os.environ)
     cmd = '{HCPPIPEDIR}/DiffusionPreprocessing/DiffPreprocPipeline.sh ' + \
@@ -191,7 +216,8 @@ parser.add_argument('--n_cpus', help='Number of CPUs/cores available to use.',
 parser.add_argument('--stages', help='Which stages to run. Space separated list.',
                    nargs="+", choices=['PreFreeSurfer', 'FreeSurfer',
                                        'PostFreeSurfer', 'fMRIVolume',
-                                       'fMRISurface', 'DiffusionPreprocessing'],
+                                       'fMRISurface', 'fMRITaskAnalysis',
+                                       'DiffusionPreprocessing'],
                    default=['PreFreeSurfer', 'FreeSurfer', 'PostFreeSurfer',
                             'fMRIVolume', 'fMRISurface',
                             'DiffusionPreprocessing'])
@@ -201,6 +227,7 @@ parser.add_argument('--gdcoeffs', help='Gradients coefficients file',
                     default="NONE")
 parser.add_argument('--license_key', help='FreeSurfer license key - letters and numbers after "*" in the email you received after registration. To register (for free) visit https://surfer.nmr.mgh.harvard.edu/registration.html',
                     required=True)
+parser.add_argument('--parcel', help='Parcellation image - (default: HCP MMP 1.0)')
 parser.add_argument('-v', '--version', action='version',
                     version='HCP Pielines BIDS App version {}'.format(__version__))
 
@@ -346,10 +373,15 @@ if args.analysis_level == "participant":
             if stage in args.stages:
                 stage_func()
 
-        bolds = [f.filename for f in layout.get(subject=subject_label,
-                                                type='bold',
-                                                extensions=["nii.gz", "nii"])]
-        for fmritcs in bolds:
+        bolds = layout.get(subject=subject_label, type='bold',
+                           extensions=["nii.gz", "nii"])
+
+        for bold in bolds:
+            fmritcs = bold.filename
+            # check number if last run (for level 2 analysis)
+            do_task_l2 = (fmritcs == layout.get(subject=subject_label, type='bold', task=bold.task,
+                                             extensions=["nii.gz", "nii"], return_type="file")[-1])
+
             fmriname = "_".join(fmritcs.split("sub-")[-1].split("_")[1:]).split(".")[0]
             assert fmriname
 
@@ -388,6 +420,22 @@ if args.analysis_level == "participant":
             # While running '/usr/bin/wb_command -cifti-create-dense-timeseries /scratch/users/chrisgor/hcp_output2/sub-100307/MNINonLinear/Results/EMOTION/EMOTION_temp_subject.dtseries.nii -volume /scratch/users/chrisgor/hcp_output2/sub-100307/MNINonLinear/Results/EMOTION/EMOTION.nii.gz /scratch/users/chrisgor/hcp_output2/sub-100307/MNINonLinear/ROIs/ROIs.2.nii.gz':
             # ERROR: label volume has a different volume space than data volume
 
+            if 'fMRITaskAnalysis' in args.stages:
+                # some setup / checks before running
+                parcellationfile = (args.parcel if args.parcel else
+                                    os.path.join(os.environ.get('HCPPIPEDIR_Templates'),
+                                                 'hcp_mmp_v1_32k.dlabel.nii'))
+                if not os.path.exists(parcellationfile):
+                    print("Parcellation file not found, skipping task analysis")
+                    args.stages.remove('fMRITaskAnalysis')
+
+                # TODO: add argparse options for below
+                parcellation = 'MMP'
+                tfilter = "200"
+                taskname = fmriname.split('_')[0] if do_task_l2 else "NONE"
+
+                # check how many runs per task
+
 
             func_stages_dict = OrderedDict([("fMRIVolume", partial(run_generic_fMRI_volume_processsing,
                                                       path=args.output_dir,
@@ -412,10 +460,25 @@ if args.analysis_level == "participant":
                                                        n_cpus=args.n_cpus,
                                                        grayordinatesres=grayordinatesres,
                                                        lowresmesh=lowresmesh,
-                                                       regname=args.coreg))
+                                                       regname=args.coreg)),
+                                ("fMRITaskAnalysis", partial(run_fMRI_task_analysis,
+                                                     path=args.output_dir,
+                                                     subject='sub-%s'%subject_label,
+                                                     fmriname=fmriname,
+                                                     taskname=taskname,
+                                                     lowresmesh=lowresmesh,
+                                                     grayordinatesres=grayordinatesres,
+                                                     fmrires=fmrires,
+                                                     tfilter=tfilter,
+                                                     parcellation=parcellation,
+                                                     parcellationfile=parcellationfile,
+                                                     n_cpus=args.n_cpus,
+                                                     ))
                                 ])
             for stage, stage_func in func_stages_dict.iteritems():
                 if stage in args.stages:
+                    if taskname == 'task-rest' and stage == 'fMRITaskAnalysis':
+                        continue
                     stage_func()
 
         dwis = layout.get(subject=subject_label, type='dwi',

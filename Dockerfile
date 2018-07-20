@@ -151,14 +151,20 @@ ENV FSL_DIR="${FSLDIR}" \
 # upgrade our libstdc++
 RUN echo "deb http://ftp.de.debian.org/debian stretch main" >> /etc/apt/sources.list && \
     apt-get update && \
-    apt-get install -y libstdc++6
+    apt-get install -y libstdc++6 libtiff5
 
 # overwrite matlab mcr shared object
 RUN rm /opt/matlabmcr-2016b/v91/sys/os/glnxa64/libstdc++.so.6 && \
-    ln -s /usr/lib/x86_64-linux-gnu/libstdc++.so.6 /opt/matlabmcr-2016b/v91/sys/os/glnxa64/libstdc++.so.6
+    rm /opt/matlabmcr-2016b/v91/bin/glnxa64/libtiff.so.5 && \
+    ln -s /usr/lib/x86_64-linux-gnu/libstdc++.so.6 /opt/matlabmcr-2016b/v91/sys/os/glnxa64/libstdc++.so.6 && \
+    ln -s /usr/lib/x86_64-linux-gnu/libtiff.so.5 /opt/matlabmcr-2016b/v91/bin/glnxa64/libtiff.so.5
+
 
 # install gradient_unwarp.py (v1.0.3)
 RUN pip install https://github.com/Washington-University/gradunwarp/archive/v1.0.3.zip
+
+# add MMP parcellation
+RUN wget -q https://www.dropbox.com/s/jx1un8tkszx14kv/hcp_mmp_v1_32k.dlabel.nii?dl=1 -O ${HCPPIPEDIR_Templates}/hcp_mmp_v1_32k.dlabel.nii
 
 COPY run.py version /
 RUN chmod +x /run.py
