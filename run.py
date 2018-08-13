@@ -167,10 +167,10 @@ def run_fMRI_task_analysis(**args):
     '--lowresmesh={lowresmesh} '
     '--grayordinatesres={grayordinatesres} '
     '--origsmoothingFWHM={fmrires} '
-    '--confound="NONE" '
+    '--confound={confound} '
     '--finalsmoothingFWHM=4 ' # additional spatial smoothing
     '--temporalfilter={tfilter} '
-    '--vba="NO" ' # volume based analysis
+    '--vba="YES" ' # volume based analysis
     '--regname="NONE" ' # generated CIFTI
     '--parcellation={parcellation} '
     '--parcellationfile={parcellationfile} '
@@ -228,6 +228,7 @@ parser.add_argument('--gdcoeffs', help='Gradients coefficients file',
 parser.add_argument('--license_key', help='FreeSurfer license key - letters and numbers after "*" in the email you received after registration. To register (for free) visit https://surfer.nmr.mgh.harvard.edu/registration.html',
                     required=True)
 parser.add_argument('--parcel', help='Parcellation image - (default: HCP MMP 1.0)')
+parser.add_argument('--confound', help='Motion confound to regress in task analysis')
 parser.add_argument('-v', '--version', action='version',
                     version='HCP Pielines BIDS App version {}'.format(__version__))
 
@@ -429,7 +430,8 @@ if args.analysis_level == "participant":
                     print("Parcellation file not found, skipping task analysis")
                     args.stages.remove('fMRITaskAnalysis')
 
-                # TODO: add argparse options for below
+                # TODO: add argparse options for below (and set defaults)
+                confound = args.confound if args.confound else "NONE"
                 parcellation = 'MMP'
                 tfilter = "200"
                 taskname = fmriname.split('_')[0] if do_task_l2 else "NONE"
@@ -469,6 +471,7 @@ if args.analysis_level == "participant":
                                                      lowresmesh=lowresmesh,
                                                      grayordinatesres=grayordinatesres,
                                                      fmrires=fmrires,
+                                                     confound=confound,
                                                      tfilter=tfilter,
                                                      parcellation=parcellation,
                                                      parcellationfile=parcellationfile,

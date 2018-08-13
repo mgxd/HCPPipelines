@@ -95,7 +95,7 @@ ENV CARET7DIR="/opt/workbench/bin_linux64"
 RUN apt-get -qq update && \
     apt-get install -yq --no-install-recommends gcc g++ libglu1 && \
     rm -rf /tmp/* && \
-    wget -qO- https://github.com/Washington-University/Pipelines/archive/v3.26.1.tar.gz | tar xz -C /tmp && \
+    wget -qO- https://github.com/mgxd/HCPpipelines-1/archive/v.3.27.1.tar.gz | tar xz -C /tmp && \
     mv /tmp/* /opt/HCP-Pipelines && \
     rm -rf /tmp/* && \
     wget -qO- https://www.doc.ic.ac.uk/~ecr05/MSM_HOCR_v2/MSM_HOCR_v2-download.tgz | tar xz -C /tmp && \
