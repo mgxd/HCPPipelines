@@ -160,8 +160,8 @@ def run_fMRI_task_analysis(**args):
     '{HCPPIPEDIR}/TaskfMRIAnalysis/TaskfMRIAnalysis.sh '
     '--path={path} '
     '--subject={subject} '
-    '--lvl1tasks={fmriname} '
-    '--lvl1fsfs={fmriname} '
+    '--lvl1tasks={l1_tasknames} '
+    '--lvl1fsfs={l1_tasknames} '
     '--lvl2task={taskname} '
     '--lvl2fsf={taskname} '
     '--lowresmesh={lowresmesh} '
@@ -250,6 +250,7 @@ else:
 
 # running participant level
 if args.analysis_level == "participant":
+    l1_tasks = []
     # find all T1s and skullstrip them
     for subject_label in subjects_to_analyze:
         t1ws = [f.filename for f in layout.get(subject=subject_label,
@@ -435,7 +436,8 @@ if args.analysis_level == "participant":
                 parcellation = 'MMP'
                 tfilter = "200"
                 taskname = fmriname.split('_')[0] if do_task_l2 else "NONE"
-
+                l1_tasks.append(fmriname)
+                l1_tasknames = '@'.join(l1_tasks)
                 # check how many runs per task
 
 
@@ -466,7 +468,7 @@ if args.analysis_level == "participant":
                                 ("fMRITaskAnalysis", partial(run_fMRI_task_analysis,
                                                      path=args.output_dir,
                                                      subject='sub-%s'%subject_label,
-                                                     fmriname=fmriname,
+                                                     l1_tasknames=l1_tasknames,
                                                      taskname=taskname,
                                                      lowresmesh=lowresmesh,
                                                      grayordinatesres=grayordinatesres,
