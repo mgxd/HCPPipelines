@@ -1,4 +1,4 @@
-#!/usr/local/miniconda/bin/python
+#!/usr/bin/env python
 
 from __future__ import print_function
 import argparse
@@ -424,16 +424,20 @@ if args.analysis_level == "participant":
 
             if 'fMRITaskAnalysis' in args.stages:
                 # some setup / checks before running
-                parcellationfile = (args.parcel if args.parcel else
-                                    os.path.join(os.environ.get('HCPPIPEDIR_Templates'),
-                                                 'hcp_mmp_v1_32k.dlabel.nii'))
-                if not os.path.exists(parcellationfile):
-                    print("Parcellation file not found, skipping task analysis")
-                    args.stages.remove('fMRITaskAnalysis')
+                if args.parcel == "NONE":
+                    parcellation = parcellationfile = args.parcel
+                else:
+                    # MMP only supported
+                    parcellationfile = (args.parcel if args.parcel else
+                                        os.path.join(os.environ.get('HCPPIPEDIR_Templates'),
+                                                     'hcp_mmp_v1_32k.dlabel.nii'))
+                    parcellation == "MMP"
+                    if not os.path.exists(parcellationfile):
+                        print("Parcellation file not found, skipping task analysis")
+                        args.stages.remove('fMRITaskAnalysis')
 
                 # TODO: add argparse options for below (and set defaults)
                 confound = args.confound if args.confound else "NONE"
-                parcellation = 'MMP'
                 tfilter = "200"
                 taskname = fmriname.split('_')[0] if do_task_l2 else "NONE"
                 l1_tasks.append(fmriname)
@@ -480,11 +484,16 @@ if args.analysis_level == "participant":
                                                      n_cpus=args.n_cpus,
                                                      ))
                                 ])
+
             for stage, stage_func in func_stages_dict.iteritems():
                 if stage in args.stages:
                     if taskname == 'task-rest' and stage == 'fMRITaskAnalysis':
                         continue
                     stage_func()
+                    # clear tasks after l2
+                    if do_task_l2:
+                        l1_tasks = []
+
 
         dwis = layout.get(subject=subject_label, type='dwi',
                                                  extensions=["nii.gz", "nii"])
